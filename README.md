@@ -1,4 +1,4 @@
-# 🕵🏾‍♂️🐛⚙️💵BUG-BOUNTY-xterminator
+# 🕵🏾‍♂️🐛 ⚙️💵BUG-BOUNTY-xterminator
 
 An advanced, highly concurrent automated reconnaissance and vulnerability eradication framework for bug bounty hunters and security researchers. 
 
