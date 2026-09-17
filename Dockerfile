@@ -1,9 +1,5 @@
-# ==============================================================================
-# BUG-Bounty-Xterminator Python Microservice Dockerfile
-# ==============================================================================
-FROM python:3.11-slim AS base
+FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
 # Install system dependencies
@@ -12,16 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install common requirements
-COPY packages/llmx/ requirements.txt* ./ 
+# Copy root requirements if present
+COPY requirements.txt* ./
+
+# Upgrade pip and install requirements
 RUN pip install --no-cache-dir --upgrade pip && \
     if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
 
-# Install core asynchronous event bus and utility packages
-RUN pip install --no-cache-dir redis httpx asyncpg scikit-learn numpy
-
-# Copy application source code
+# Copy all repository files into the container
 COPY . .
 
-# Default command (overridden in docker-compose.yml per service)
-CMD ["python3", "main.py"]
+CMD ["python", "packages/mlx/main.py"]
