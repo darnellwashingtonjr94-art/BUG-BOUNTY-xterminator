@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Configuration Defaults (Override via environment variables)
 START_IDX="${START_IDX:-1}"
-END_IDX="${END_IDX:-30}"
+END_IDX="${END_IDX:-40}"
 CONCURRENCY="${CONCURRENCY:-30}"
 BATCH_OUTPUT="${BATCH_OUTPUT:-batch_jobs.json}"
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-packages/video-gen/downloads}"
