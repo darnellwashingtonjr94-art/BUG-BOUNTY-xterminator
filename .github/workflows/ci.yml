@@ -40,7 +40,7 @@ jobs:
       - name: Install Node Dependencies & Build Dashboard
         run: |
           cd apps/reporter
-          npm ci
+          npm install
           npm run build
 
       - name: Test Docker Compose Configuration
