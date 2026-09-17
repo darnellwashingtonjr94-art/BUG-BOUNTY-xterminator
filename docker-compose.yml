@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # -- Infrastructure --
+  redis-event-bus:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - swarm_net
+
+  postgres-state:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: xterminator
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: bounty_state
+    networks:
+      - swarm_net
+
+  # -- Packages (Shared Services) --
+  llmx-swarm:
+    build: 
+      context: ./packages/llmx
+    environment:
+      - REDIS_URL=redis://redis-event-bus:6379
+      - DB_URL=postgresql://xterminator:dev_password@postgres-state:5432/bounty_state
+    depends_on:
+      - redis-event-bus
+    networks:
+      - swarm_net
+
+  mlx-anomaly:
+    build:
+      context: ./packages/mlx
+    environment:
+      - MODEL_ENV=production
+    networks:
+      - swarm_net
+
+  # -- Applications --
+  scout-engine:
+    build:
+      context: ./apps/scout
+    environment:
+      - REDIS_URL=redis://redis-event-bus:6379
+    networks:
+      - swarm_net
+      - target_net # Outbound access for recon
+
+  hunter-execution:
+    build:
+      context: ./apps/hunter
+    environment:
+      - REDIS_URL=redis://redis-event-bus:6379
+    networks:
+      - swarm_net
+      - target_net
+
+networks:
+  swarm_net:
+    internal: true # Secure internal communication
+  target_net:
+    driver: bridge # Outbound traffic only
