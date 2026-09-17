@@ -2,7 +2,6 @@ name: Generate Video PoCs Pipeline
 
 on:
   schedule:
-    # Runs every Sunday at 00:00 UTC
     - cron: '0 0 * * 0'
   workflow_dispatch:
     inputs:
@@ -38,6 +37,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install google-genai
 
+      - name: Ensure Pipeline Script Exists
+        run: |
+          mkdir -p packages/video-gen
+          cat << 'EOF' > packages/video-gen/run_pipeline.sh
+          #!/usr/bin/env bash
+          set -euo pipefail
+          START_IDX="${START_IDX:-1}"
+          END_IDX="${END_IDX:-40}"
+          CONCURRENCY="${CONCURRENCY:-30}"
+          BATCH_OUTPUT="${BATCH_OUTPUT:-batch_jobs.json}"
+          DOWNLOAD_DIR="${DOWNLOAD_DIR:-packages/video-gen/downloads}"
+          POLL_INTERVAL="${POLL_INTERVAL:-15}"
+
+          echo "[PIPELINE] Starting batch submissions for scripts ${START_IDX} to ${END_IDX}..."
+          python3 packages/video-gen/run_batch.py \
+              --start "${START_IDX}" \
+              --end "${END_IDX}" \
+              --concurrency "${CONCURRENCY}" \
+              --output "${BATCH_OUTPUT}"
+
+          echo "[PIPELINE] Polling and downloading generated videos..."
+          python3 packages/video-gen/poll_and_download.py \
+              --input "${BATCH_OUTPUT}" \
+              --output-dir "${DOWNLOAD_DIR}" \
+              --interval "${POLL_INTERVAL}"
+          echo "[SUCCESS] Pipeline complete!"
+          EOF
+          chmod +x packages/video-gen/run_pipeline.sh
+
       - name: Execute Video Pipeline
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
@@ -46,7 +74,6 @@ jobs:
           CONCURRENCY: ${{ inputs.concurrency || '30' }}
           DOWNLOAD_DIR: 'packages/video-gen/downloads'
         run: |
-          chmod +x packages/video-gen/run_pipeline.sh
           ./packages/video-gen/run_pipeline.sh
 
       - name: Upload Generated Videos as Artifacts
@@ -72,16 +99,17 @@ jobs:
             TITLE="❌ Veo 3 Video PoC Pipeline Failed"
           fi
 
-          curl -H "Content-Type: application/json" \
+          # Added -g flag to curl to prevent bracket parsing errors!
+          curl -g -H "Content-Type: application/json" \
                -X POST \
-               -d '{
-                 "embeds": [{
-                   "title": "'"$TITLE"'",
-                   "description": "Video PoC generation completed with status: **'"$STATUS"'**.\n\n[📥 Download Video Artifacts]('"$RUN_URL"')",
-                   "color": '$COLOR',
-                   "fields": [
-                     { "name": "Repository", "value": "'"${{ github.repository }}"'", "inline": true },
-                     { "name": "Run ID", "value": "'"${{ github.run_id }}"'", "inline": true }
+               -d "{
+                 \"embeds\": [{
+                   \"title\": \"$TITLE\",
+                   \"description\": \"Video PoC generation completed with status: **$STATUS**.\n\n[Download Video Artifacts]($RUN_URL)\",
+                   \"color\": $COLOR,
+                   \"fields\": [
+                     { \"name\": \"Repository\", \"value\": \"${{ github.repository }}\", \"inline\": true },
+                     { \"name\": \"Run ID\", \"value\": \"${{ github.run_id }}\", \"inline\": true }
                    ]
                  }]
-               }' "$DISCORD_WEBHOOK"
+               }" "$DISCORD_WEBHOOK"
