@@ -1,3 +1,4 @@
+
 name: Generate Video PoCs Pipeline
 
 on:
@@ -56,3 +57,32 @@ jobs:
           name: video-pocs-${{ github.run_id }}
           path: packages/video-gen/downloads/*.mp4
           retention-days: 7
+
+      - name: Send Discord Webhook Notification
+        if: always()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            COLOR=3066993
+            TITLE="✅ Veo 3 Video PoC Pipeline Completed"
+          else
+            COLOR=15158332
+            TITLE="❌ Veo 3 Video PoC Pipeline Failed"
+          fi
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d '{
+                 "embeds": [{
+                   "title": "'"$TITLE"'",
+                   "description": "Video PoC generation completed with status: **'"$STATUS"'**.\n\n[📥 Download Video Artifacts]('"$RUN_URL"')",
+                   "color": '$COLOR',
+                   "fields": [
+                     { "name": "Repository", "value": "'"${{ github.repository }}"'", "inline": true },
+                     { "name": "Run ID", "value": "'"${{ github.run_id }}"'", "inline": true }
+                   ]
+                 }]
+               }' "$DISCORD_WEBHOOK"
