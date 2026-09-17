@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="IMG_4432.jpeg" alt="Bug-Bounty-Xtractor Logo" width="600">
+</p>
+
 ## 💻 Tech Stack
 
 ### Core Programming Languages & Core Systems
