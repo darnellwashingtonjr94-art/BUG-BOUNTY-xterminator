@@ -1,7 +1,8 @@
+#!/usr/init/env python3
 #!/usr/bin/env python3
 """
 Dynamic Range Batch Runner for Veo 3 Video Generation
-Loads script configs dynamically by index range and submits them asynchronously.
+Loads script configs dynamically by index range (1 to 40) and submits them asynchronously.
 """
 
 import argparse
@@ -9,7 +10,6 @@ import asyncio
 import importlib.util
 import json
 import os
-import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -99,9 +99,9 @@ def load_script_configs(scripts_dir: Path, start_idx: int, end_idx: int) -> List
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Range-Select Veo 3 Batch Submission Runner")
+    parser = argparse.ArgumentParser(description="Range-Select Veo 3 Batch Submission Runner (1-40)")
     parser.add_argument("--start", type=int, default=1, help="Start script index (default: 1)")
-    parser.add_argument("--end", type=int, default=30, help="End script index (default: 30)")
+    parser.add_argument("--end", type=int, default=40, help="End script index (default: 40)")
     parser.add_argument("--concurrency", type=int, default=30, help="Max parallel API calls (default: 30)")
     parser.add_argument("--output", type=Path, default=Path("batch_jobs.json"), help="Output JSON path for poller")
     args = parser.parse_args()
