@@ -1,10 +1,10 @@
-# 🐛 BUG-BOUNTY-xterminator
+# 🕵🏾‍♂️🐛⚙️💵BUG-BOUNTY-xterminator
 
 An advanced, highly concurrent automated reconnaissance and vulnerability eradication framework for bug bounty hunters and security researchers. 
 
 ---
 
-## 🐛 What is BUG-BOUNTY-xterminator?
+## What is BUG-BOUNTY-xterminator?
 **BUG-BOUNTY-xterminator** is an end-to-end security automation engine. It acts as a force multiplier for penetration testers by chaining together industry-standard tools and custom scripts into a single, high-performance pipeline. It handles everything from initial asset discovery to active vulnerability scanning and real-time reporting.
 
 ## 🎯 What is this about?
