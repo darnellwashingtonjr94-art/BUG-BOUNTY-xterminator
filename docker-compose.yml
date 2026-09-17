@@ -1,64 +1,137 @@
 version: '3.8'
 
 services:
-  # -- Infrastructure --
+  # ============================================================================
+  # Infrastructure Services (State & Event Bus)
+  # ============================================================================
   redis-event-bus:
     image: redis:alpine
+    container_name: xterminator-redis
     ports:
       - "6379:6379"
     networks:
       - swarm_net
+    restart: unless-stopped
 
   postgres-state:
     image: postgres:15-alpine
+    container_name: xterminator-postgres
     environment:
       POSTGRES_USER: xterminator
       POSTGRES_PASSWORD: dev_password
       POSTGRES_DB: bounty_state
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./configs/migrations:/docker-entrypoint-initdb.d
     networks:
       - swarm_net
+    restart: unless-stopped
 
-  # -- Packages (Shared Services) --
-  llmx-swarm:
-    build: 
-      context: ./packages/llmx
+  # ============================================================================
+  # Shared Packages & Intelligence Daemons
+  # ============================================================================
+  mlx-anomaly:
+    build:
+      context: .
+      dockerfile: apps/scout/Dockerfile # Or dedicated shared Dockerfile
+    command: python3 packages/mlx/main.py
     environment:
       - REDIS_URL=redis://redis-event-bus:6379
       - DB_URL=postgresql://xterminator:dev_password@postgres-state:5432/bounty_state
+      - MODEL_ENV=production
+    depends_on:
+      - redis-event-bus
+      - postgres-state
+    networks:
+      - swarm_net
+    restart: unless-stopped
+
+  gemini-analyzer:
+    build:
+      context: .
+      dockerfile: apps/scout/Dockerfile
+    command: python3 packages/gemini/analyzer.py
+    environment:
+      - REDIS_URL=redis://redis-event-bus:6379
+      - DB_URL=postgresql://xterminator:dev_password@postgres-state:5432/bounty_state
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    depends_on:
+      - redis-event-bus
+      - postgres-state
+    networks:
+      - swarm_net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Operational Applications (Swarm Agents)
+  # ============================================================================
+  scout-engine:
+    build:
+      context: .
+      dockerfile: apps/scout/Dockerfile
+    command: python3 apps/scout/main.py
+    environment:
+      - REDIS_URL=redis://redis-event-bus:6379
     depends_on:
       - redis-event-bus
     networks:
       - swarm_net
-
-  mlx-anomaly:
-    build:
-      context: ./packages/mlx
-    environment:
-      - MODEL_ENV=production
-    networks:
-      - swarm_net
-
-  # -- Applications --
-  scout-engine:
-    build:
-      context: ./apps/scout
-    environment:
-      - REDIS_URL=redis://redis-event-bus:6379
-    networks:
-      - swarm_net
-      - target_net # Outbound access for recon
+      - target_net
+    restart: unless-stopped
 
   hunter-execution:
     build:
-      context: ./apps/hunter
+      context: .
+      dockerfile: apps/scout/Dockerfile
+    command: python3 apps/hunter/main.py
     environment:
       - REDIS_URL=redis://redis-event-bus:6379
+    depends_on:
+      - redis-event-bus
     networks:
       - swarm_net
       - target_net
+    restart: unless-stopped
+
+  validator-engine:
+    build:
+      context: .
+      dockerfile: apps/scout/Dockerfile
+    command: python3 apps/validator/main.py
+    environment:
+      - REDIS_URL=redis://redis-event-bus:6379
+    depends_on:
+      - redis-event-bus
+    networks:
+      - swarm_net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Presentation Layer (Next.js Dashboard)
+  # ============================================================================
+  reporter-dashboard:
+    build:
+      context: ./apps/reporter
+      dockerfile: Dockerfile
+    container_name: xterminator-dashboard
+    environment:
+      - DB_URL=postgresql://xterminator:dev_password@postgres-state:5432/bounty_state
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres-state
+    networks:
+      - swarm_net
+    restart: unless-stopped
+
+volumes:
+  pgdata:
 
 networks:
   swarm_net:
-    internal: true # Secure internal communication
+    internal: true # Secure internal bridge for microservice communication
   target_net:
-    driver: bridge # Outbound traffic only
+    driver: bridge # Permits outbound web requests for scout and hunter
