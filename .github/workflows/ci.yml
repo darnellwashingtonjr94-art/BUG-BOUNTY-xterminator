@@ -30,7 +30,7 @@ jobs:
           # Stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # Exit-zero treats all other errors as warnings
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          flake8 . --count --exit-zero --max-complexity=127 --statistics
 
       - name: Set up Node.js for Reporter Dashboard
         uses: actions/setup-node@v4
@@ -46,9 +46,4 @@ jobs:
           npm run build
 
       - name: Test Docker Compose Configuration
-        uses: docker/compose-action@v2
-        with:
-          version: 'v2.24.0'
-          comment_is_x: true
-          run: |
-            docker compose config
+        run: docker compose config
