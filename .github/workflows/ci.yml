@@ -40,6 +40,7 @@ jobs:
       - name: Install Node Dependencies & Build Dashboard
         run: |
           cd apps/reporter
+          npm cache clean --force
           npm install
           npm run build
 
