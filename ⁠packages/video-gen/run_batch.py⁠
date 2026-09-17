@@ -1,0 +1,133 @@
+# packages/video-gen/run_batch.py
+import asyncio
+import importlib.util
+import os
+from pathlib import Path
+from typing import Dict, Any, List
+
+from google import genai
+from google.genai import types
+
+
+async def submit_script_job(
+    aclient: genai.Client,
+    config: Dict[str, Any],
+    semaphore: asyncio.Semaphore
+) -> Dict[str, Any]:
+    """Submits a single video generation task to the Google Flow / Veo 3 API asynchronously."""
+    async with semaphore:
+        script_id = config.get("id", "unknown")
+        title = config.get("title", "Untitled")
+        prompt = config.get("prompt", "")
+        model = config.get("model", "veo-3.1-fast-generate-preview")
+        aspect_ratio = config.get("aspect_ratio", "16:9")
+        duration = config.get("duration_seconds", 8)
+
+        print(f"[*] Submitting [{script_id}] '{title}'...")
+
+        try:
+            # Build API request configuration
+            video_config = types.GenerateVideosConfig(
+                aspect_ratio=aspect_ratio,
+                duration_seconds=duration
+            )
+
+            # Async call to generate video using google-genai SDK
+            operation = await aclient.models.generate_videos(
+                model=model,
+                prompt=prompt,
+                config=video_config
+            )
+
+            print(f"[+] Successfully submitted [{script_id}]. Operation ID: {operation.name}")
+            return {
+                "script_id": script_id,
+                "title": title,
+                "status": "SUBMITTED",
+                "operation_name": operation.name,
+                "error": None
+            }
+
+        except Exception as e:
+            print(f"[-] Failed to submit [{script_id}]: {e}")
+            return {
+                "script_id": script_id,
+                "title": title,
+                "status": "FAILED",
+                "operation_name": None,
+                "error": str(e)
+            }
+
+
+def load_script_configs(scripts_dir: Path, start_idx: int = 11, end_idx: int = 20) -> List[Dict[str, Any]]:
+    """Dynamically imports script modules from target index range and extracts SCRIPT_CONFIG."""
+    loaded_configs = []
+
+    for idx in range(start_idx, end_idx + 1):
+        # Match filenames like 11_*.py or 11_rate_limit_evasion.py
+        matching_files = list(scripts_dir.glob(f"{idx:02d}_*.py")) + list(scripts_dir.glob(f"{idx}_*.py"))
+
+        if not matching_files:
+            print(f"[!] Warning: No script file found matching index {idx}")
+            continue
+
+        script_path = matching_files[0]
+        module_name = f"script_module_{idx}"
+
+        # Dynamic module loading via importlib
+        spec = importlib.util.spec_from_file_location(module_name, script_path)
+        if spec and spec.loader:
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            if hasattr(module, "SCRIPT_CONFIG"):
+                loaded_configs.append(module.SCRIPT_CONFIG)
+                print(f"[+] Loaded configuration from {script_path.name}")
+            else:
+                print(f"[!] Warning: {script_path.name} does not define SCRIPT_CONFIG")
+
+    return loaded_configs
+
+
+async def main():
+    # 1. Resolve scripts directory
+    base_dir = Path(__file__).parent if "__file__" in globals() else Path.cwd()
+    scripts_dir = base_dir / "scripts"
+
+    if not scripts_dir.exists():
+        scripts_dir = Path("packages/video-gen/scripts")
+
+    print(f"[*] Scanning scripts directory: {scripts_dir.resolve()}")
+
+    # 2. Load configs for scripts 11 through 20
+    configs = load_script_configs(scripts_dir, start_idx=11, end_idx=20)
+    print(f"[*] Total script configs loaded: {len(configs)}")
+
+    if not configs:
+        print("[-] No configurations found to process. Exiting.")
+        return
+
+    # 3. Limit API concurrency (default 5 parallel submissions)
+    concurrency_limit = int(os.getenv("CONCURRENCY_LIMIT", "5"))
+    semaphore = asyncio.Semaphore(concurrency_limit)
+
+    # 4. Execute asynchronous API calls via google-genai async client
+    async with genai.Client().aio as aclient:
+        tasks = [
+            submit_script_job(aclient, config, semaphore)
+            for config in configs
+        ]
+
+        results = await asyncio.gather(*tasks)
+
+    # 5. Output Summary
+    print("\n" + "=" * 50)
+    print(" BATCH SUBMISSION SUMMARY ")
+    print("=" * 50)
+    for res in results:
+        status_icon = "✓" if res["status"] == "SUBMITTED" else "✗"
+        print(f"[{status_icon}] {res['script_id']}: {res['status']} | Op: {res['operation_name'] or res['error']}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
