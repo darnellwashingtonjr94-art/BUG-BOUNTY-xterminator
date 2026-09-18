@@ -99,7 +99,7 @@ Bug bounty hunting involves a massive amount of tedious, repetitive groundworkâ€
 
 ```bash
 # 1. Clone the repository
-git clone [https://github.com/yourusername/BUG-BOUNTY-xterminator.git](https://github.com/yourusername/BUG-BOUNTY-xterminator.git)
+git clone [https://github.com/darnellwashingtonjr94-art/BUG-BOUNTY-xterminator.git](https://github.com/darnellwashingtonjr94-art/BUG-BOUNTY-xterminator.git)
 
 # 2. Navigate into the directory
 cd BUG-BOUNTY-xterminator
